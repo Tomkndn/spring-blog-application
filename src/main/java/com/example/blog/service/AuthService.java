@@ -2,9 +2,11 @@ package com.example.blog.service;
 
 import com.example.blog.model.User;
 import com.example.blog.repository.UserRepository;
-import com.example.blog.security.JwtUtil;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import com.example.blog.service.JwtService;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -12,36 +14,58 @@ import java.util.Optional;
 @Service
 public class AuthService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
-    private BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-
-    public String signup(String username, String password, String name, String email) {
-        if (userRepository.findByEmail(email).isPresent()) {
-            throw new RuntimeException("Username already exists!");
-        }
-
-        User user = new User();
-        user.setUsername(username);
-        user.setName(name);
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(password));
-        userRepository.save(user);
-
-        return "User registered successfully!";
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+            AuthenticationManager authenticationManager, JwtService jwtService) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.jwtService = jwtService;
     }
 
-    public String signin(String email, String password) {
+    public AuthResponse signIn(String email, String password) {
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, password));
+
         Optional<User> userOptional = userRepository.findByEmail(email);
-        if (userOptional.isPresent() && passwordEncoder.matches(password, userOptional.get().getPassword())) {
-            return jwtUtil.generateToken(email);
-        } else {
-            throw new RuntimeException("Invalid username or password");
+        if (userOptional.isEmpty()) {
+            throw new RuntimeException("User not found");
         }
+
+        User user = userOptional.get();
+        String jwtToken = jwtService.generateToken(user);
+
+        return new AuthResponse(
+                "You are signed in successfully",
+                user.getId(),
+                user.getEmail(),
+                jwtToken);
+    }
+
+    public AuthResponse signUp(String name, String email,String username, String password) {
+        Optional<User> existingUser = userRepository.findByEmail(email);
+        if (existingUser.isPresent()) {
+            throw new RuntimeException("Email is already taken");
+        }
+
+        User newUser = new User();
+        newUser.setName(name);
+        newUser.setEmail(email);
+        newUser.setUsername(username);
+        newUser.setPassword(passwordEncoder.encode(password));
+
+        userRepository.save(newUser);
+
+        String jwtToken = jwtService.generateToken(newUser);
+
+        return new AuthResponse(
+                "Signup successful",
+                newUser.getId(),
+                newUser.getEmail(),
+                jwtToken);
     }
 
 }

@@ -1,25 +1,34 @@
 package com.example.blog.controller;
 
+import com.example.blog.service.AuthResponse;
 import com.example.blog.service.AuthService;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
-    private AuthService authService;
+    private final AuthService authService;
+
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
 
     @PostMapping("/signup")
-    public String signup(@RequestBody Map<String, String> request) {
-        return authService.signup(request.get("username"), request.get("password"),request.get("name"),request.get("email"));
+    public ResponseEntity<AuthResponse> signUp(@RequestParam String name, @RequestParam String email,@RequestParam String username,
+            @RequestParam String password) {
+        return ResponseEntity.ok(authService.signUp(name, email,username, password));
     }
 
     @PostMapping("/signin")
-    public String signin(@RequestBody Map<String, String> request) {
-        return authService.signin(request.get("email"), request.get("password"));
+    public ResponseEntity<AuthResponse> signIn(@RequestParam String email, @RequestParam String password) {
+        System.out.printf(email,password);
+        return ResponseEntity.ok(authService.signIn(email, password));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
+        return ResponseEntity.ok("{\"message\": \"You have been logged out successfully\"}");
     }
 }
